@@ -3336,6 +3336,1912 @@ function drawSakuraBg(W, H){
     _origSwitchLang(page);
   };
 })();
+/* ================= АДМИН-ПАНЕЛЬ (ТОЛЬКО ДЛЯ WKORABLIKW) ================= */
+(function(){
+  var ADMIN_LOGIN_CHECK = "WkorablikW";
+
+  function isRealAdmin(){
+    if(typeof currentUser === 'undefined' || !currentUser) return false;
+    if(!currentUser.admin) return false;
+    if(currentUser.login !== ADMIN_LOGIN_CHECK) return false;
+    return true;
+  }
+
+  var btnAdmin = document.createElement('div');
+  btnAdmin.className = 'profile-logout';
+  btnAdmin.style.cssText = 'background:rgba(168,85,247,.15);border-color:rgba(168,85,247,.4);color:#a855f7;margin-top:10px;display:none';
+  btnAdmin.id = 'btnAdmin';
+  btnAdmin.textContent = '👑 Админ-панель';
+  document.getElementById('profileView').appendChild(btnAdmin);
+
+  /* показывать только тебе */
+  function updateAdminBtn(){
+    btnAdmin.style.display = isRealAdmin() ? 'block' : 'none';
+  }
+  updateAdminBtn();
+
+  /* --- Экран --- */
+  var adminView = document.createElement('div');
+  adminView.className = 'auth';
+  adminView.id = 'adminView';
+  adminView.style.zIndex = 5500;
+  adminView.innerHTML =
+    '<div class="auth-logo">👑</div>' +
+    '<div class="auth-title">Админ-панель</div>' +
+    '<div class="auth-sub">Начисли себе всё что хочешь</div>' +
+
+    '<div class="auth-sub" style="text-align:left;margin:16px 0 8px;font-weight:600;color:var(--txt)">⭐ Звёзды:</div>' +
+    '<div class="auth-field"><input type="number" id="admStars" placeholder="Например 999999999"></div>' +
+    '<button class="auth-btn main" id="admAddStars">Начислить ★</button>' +
+
+    '<div class="auth-sub" style="text-align:left;margin:16px 0 8px;font-weight:600;color:var(--txt)">🏆 Уровень:</div>' +
+    '<div class="auth-field"><input type="number" id="admLvl" placeholder="Например 900"></div>' +
+    '<button class="auth-btn main" id="admSetLvl">Установить уровень</button>' +
+
+    '<div class="auth-sub" style="text-align:left;margin:16px 0 8px;font-weight:600;color:var(--txt)">🎭 Выдать НФТ (id):</div>' +
+    '<div class="auth-field"><input type="text" id="admNftId" placeholder="dno, c1, s1, m1, l1..."></div>' +
+    '<button class="auth-btn main" id="admAddNft">Выдать НФТ</button>' +
+
+    '<button class="auth-btn main" id="admAllNft">🎁 Выдать ВСЕ НФТ</button>' +
+
+    '<div class="auth-sub" style="text-align:left;margin:16px 0 8px;font-weight:600;color:var(--txt)">⏳ Время подписки (часов):</div>' +
+    '<div class="auth-field"><input type="number" id="admHours" placeholder="Например 999999"></div>' +
+    '<button class="auth-btn main" id="admAddHours">Добавить часы</button>' +
+
+    '<button class="auth-btn main" id="admForever" style="background:#b8860b">♾️ Подписка навсегда</button>' +
+
+    '<button class="auth-btn main" id="admResetBlocks" style="background:#7f1d1d">💎 Сбросить все блокировки</button>' +
+
+    '<button class="auth-btn guest" id="admBack">Назад</button>';
+  document.body.appendChild(adminView);
+
+  document.getElementById('btnAdmin').onclick = function(){
+    if(!isRealAdmin()){ toast('Нет доступа'); return; }
+    document.getElementById('adminView').classList.add('on');
+  };
+  document.getElementById('admBack').onclick = function(){
+    document.getElementById('adminView').classList.remove('on');
+  };
+
+  function getAdmProfile(){
+    if(!isRealAdmin()) return null;
+    return getProfile(currentUser.login);
+  }
+
+  function refreshAll(){
+    if(typeof renderProfile === 'function') renderProfile();
+    if(typeof renderShop === 'function') renderShop();
+    if(typeof updateUserUI === 'function') updateUserUI();
+  }
+
+  document.getElementById('admAddStars').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    var v = parseInt(document.getElementById('admStars').value);
+    if(!v){ toast('Введи число'); return; }
+    p.stars += v;
+    saveProfiles(); refreshAll();
+    toast('+' + v + '★');
+  };
+
+  document.getElementById('admSetLvl').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    var v = parseInt(document.getElementById('admLvl').value);
+    if(!v || v < 0){ toast('Введи число'); return; }
+    p.lvl = v;
+    saveProfiles(); refreshAll();
+    toast('Уровень: ' + v);
+  };
+
+  document.getElementById('admAddNft').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    var id = document.getElementById('admNftId').value.trim();
+    if(!id){ toast('Введи id'); return; }
+    var item = SHOP.find(function(x){ return x.id === id; });
+    if(!item){ toast('Нет такого НФТ'); return; }
+    if(p.owned.indexOf(id) < 0) p.owned.push(id);
+    p.activeEmoji = item.emoji;
+    saveProfiles(); refreshAll();
+    toast('НФТ: ' + item.emoji);
+  };
+
+  document.getElementById('admAllNft').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    SHOP.forEach(function(item){
+      if(p.owned.indexOf(item.id) < 0) p.owned.push(item.id);
+    });
+    saveProfiles(); refreshAll();
+    toast('Все НФТ выданы');
+  };
+
+  document.getElementById('admAddHours').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    var h = parseInt(document.getElementById('admHours').value);
+    if(!h || h < 1){ toast('Введи часы'); return; }
+    if(!p.subStart){ p.subStart = Date.now(); p.subHours = 0; }
+    var elapsed = (Date.now() - p.subStart) / 3600000;
+    var left = Math.max(0, (p.subHours || 0) - elapsed);
+    p.subStart = Date.now();
+    p.subHours = left + h;
+    saveProfiles();
+    toast('+' + h + ' ч');
+  };
+
+  document.getElementById('admForever').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    p.subForever = true;
+    saveProfiles();
+    toast('Подписка: навсегда ♾️');
+  };
+
+  document.getElementById('admResetBlocks').onclick = function(){
+    if(!isRealAdmin()) return;
+    var p = getAdmProfile();
+    p.lastSnake = 0;
+    p.lastWheel = 0;
+    p.snakeDaily = 0;
+    p.snakeDay = '';
+    saveProfiles();
+    toast('Блокировки сброшены');
+  };
+
+  /* Обновляем видимость кнопки при входе/выходе */
+  var _origSwitchAdmin = switchPage;
+  switchPage = function(page){
+    var av = document.getElementById('adminView');
+    if(av) av.classList.remove('on');
+    updateAdminBtn();
+    _origSwitchAdmin(page);
+  };
+
+  /* Периодически проверяем — если не админ, скрываем */
+  setInterval(updateAdminBtn, 1000);
+})();
+/* ================= РОВНЫЕ КНОПКИ ПРОФИЛЯ ================= */
+(function(){
+  /* Стиль для всех кнопок профиля */
+  var style = document.createElement('style');
+  style.textContent =
+    '#profileView .profile-logout{' +
+      'padding:16px !important;' +
+      'border-radius:14px !important;' +
+      'font-size:15px !important;' +
+      'font-weight:600 !important;' +
+      'text-align:center !important;' +
+      'margin-top:10px !important;' +
+      'line-height:1.2 !important;' +
+      'box-sizing:border-box !important;' +
+      'height:54px !important;' +
+      'display:flex !important;' +
+      'align-items:center !important;' +
+      'justify-content:center !important;' +
+      'position:relative !important;' +
+      'overflow:hidden !important;' +
+    '}' +
+    '#profileView .profile-logout:first-of-type{margin-top:20px !important}';
+  document.head.appendChild(style);
+})();
+/* ================= ЗАКРЫТИЕ ОКОН ДРУГ ДРУГОМ ================= */
+(function(){
+  /* Наблюдаем за добавлением класса .on к любому .auth */
+  var observer = new MutationObserver(function(mutations){
+    mutations.forEach(function(m){
+      var el = m.target;
+      if(el.classList && el.classList.contains('auth') && el.classList.contains('on')){
+        /* закрываем все остальные */
+        document.querySelectorAll('.auth.on').forEach(function(other){
+          if(other !== el) other.classList.remove('on');
+        });
+      }
+    });
+  });
+})();
+/* ================= BLOCK BLAST ================= */
+(function(){
+  var intList = document.getElementById('page-interesting').querySelector('.settings-list');
+  if(!intList) return;
+
+  var blastBtn = document.createElement('div');
+  blastBtn.className = 'set-item';
+  blastBtn.id = 'openBlast';
+  blastBtn.innerHTML =
+    '<div class="set-ico" style="font-size:22px">🧱</div>' +
+    '<div class="set-body">' +
+      '<div class="set-name">Block Blast</div>' +
+      '<div class="set-desc">Ставь блоки, лопай линии (+70★)</div>' +
+    '</div>' +
+    '<div class="set-arrow">›</div>';
+  intList.appendChild(blastBtn);
+
+  var blastView = document.createElement('div');
+  blastView.className = 'subpage';
+  blastView.id = 'sub-blast';
+  blastView.innerHTML =
+    '<div class="sub-head">' +
+      '<div class="sub-back" id="backBlast"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>' +
+      '<div class="sub-title">Block Blast</div>' +
+    '</div>' +
+    '<div class="stars-head" style="padding:8px 0">' +
+      '<div class="stars-big" id="blastScore">0 ★</div>' +
+      '<div class="stars-big-label">Заработано за игру</div>' +
+    '</div>' +
+    '<canvas id="blastCanvas" style="width:100%;background:#1a0f2e;border-radius:16px;touch-action:none;display:block"></canvas>' +
+    '<div id="blastPieces" style="display:flex;justify-content:space-around;align-items:center;background:#1a0f2e;border-radius:16px;padding:14px 8px;margin-top:10px;min-height:90px"></div>' +
+    '<div class="star-cooldown" id="blastCooldown" style="display:none">Лимит 3000★. Ждать <b id="blastTimer">24:00:00</b></div>';
+  document.body.appendChild(blastView);
+
+  var canvas = document.getElementById('blastCanvas');
+  var ctx = canvas.getContext('2d');
+  var COLS = 8;
+  var ROWS = 10;
+  var CELL = 40;
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  canvas.style.height = (ROWS * CELL) + 'px';
+
+  var board, score, gameActive;
+  var pieces = [];
+  var selectedPiece = -1;
+
+  var shapes = [
+    [[1]],
+    [[1,1]],
+    [[1],[1]],
+    [[1,1],[1,1]],
+    [[1,1,1]],
+    [[1],[1],[1]],
+    [[1,1,1,1]],
+    [[1],[1],[1],[1]],
+    [[1,0],[1,1]],
+    [[0,1],[1,1]],
+    [[1,1],[1,0]],
+    [[1,1],[0,1]],
+    [[1,1,1],[0,1,0]],
+    [[1,1],[1,1],[1,1]]
+  ];
+
+  function newShape(){
+    var s = shapes[Math.floor(Math.random()*shapes.length)];
+    return {
+      shape: s,
+      color: ['#ffd93d','#ff6b6b','#4ecdc4','#a78bfa','#f472b6'][Math.floor(Math.random()*5)],
+      w: s[0].length,
+      h: s.length
+    };
+  }
+
+  function fillPieces(){
+    pieces = [];
+    while(pieces.length < 3) pieces.push(newShape());
+  }
+
+  function resetBoard(){
+    board = [];
+    for(var r=0; r<ROWS; r++){
+      var row = [];
+      for(var c=0; c<COLS; c++) row.push(0);
+      board.push(row);
+    }
+  }
+
+  function drawBlock(px, py, color){
+    ctx.fillStyle = color;
+    ctx.fillRect(px+2, py+2, CELL-4, CELL-4);
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px+2, py+2, CELL-4, CELL-4);
+  }
+
+  function draw(){
+    ctx.fillStyle = '#1a0f2e';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    for(var r=0; r<ROWS; r++){
+      for(var c=0; c<COLS; c++){
+        if(board[r][c]){
+          drawBlock(c*CELL, r*CELL, board[r][c]);
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,.05)';
+          ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+        }
+      }
+    }
+  }
+
+  /* --- рисуем фигуры в HTML --- */
+  function renderPieces(){
+    var box = document.getElementById('blastPieces');
+    box.innerHTML = '';
+    pieces.forEach(function(p, i){
+      var wrap = document.createElement('div');
+      wrap.style.cssText =
+        'display:grid;' +
+        'grid-template-columns:repeat(' + p.w + ',18px);' +
+        'grid-template-rows:repeat(' + p.h + ',18px);' +
+        'gap:2px;cursor:pointer;padding:6px;border-radius:10px;' +
+        'border:2px solid ' + (selectedPiece === i ? '#3b82f6' : 'transparent') + ';';
+      for(var r=0; r<p.h; r++){
+        for(var c=0; c<p.w; c++){
+          var cell = document.createElement('div');
+          if(p.shape[r][c]){
+            cell.style.cssText = 'background:' + p.color + ';border-radius:3px';
+          } else {
+            cell.style.cssText = 'background:transparent';
+          }
+          wrap.appendChild(cell);
+        }
+      }
+      wrap.onclick = function(){
+        selectedPiece = i;
+        renderPieces();
+      };
+      box.appendChild(wrap);
+    });
+  }
+
+  function checkLines(){
+    var cleared = 0;
+    for(var r=ROWS-1; r>=0; r--){
+      var full = true;
+      for(var c=0; c<COLS; c++){
+        if(!board[r][c]){ full = false; break; }
+      }
+      if(full){
+        board.splice(r, 1);
+        board.unshift([0,0,0,0,0,0,0,0]);
+        cleared++;
+        r++;
+      }
+    }
+    if(cleared > 0){
+      score += cleared * 70;
+      document.getElementById('blastScore').textContent = score + ' ★';
+      if(typeof toast === 'function') toast('+' + (cleared * 70) + '★');
+    }
+  }
+
+  function canPlace(p, row, col){
+    if(row + p.h > ROWS) return false;
+    if(col + p.w > COLS) return false;
+    for(var r=0; r<p.h; r++){
+      for(var c=0; c<p.w; c++){
+        if(p.shape[r][c] && board[row+r][col+c]) return false;
+      }
+    }
+    return true;
+  }
+
+  function placePiece(p, row, col){
+    for(var r=0; r<p.h; r++){
+      for(var c=0; c<p.w; c++){
+        if(p.shape[r][c]) board[row+r][col+c] = p.color;
+      }
+    }
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    if(!gameActive) return;
+    if(selectedPiece === -1) return;
+    var rect = canvas.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    var c = Math.floor(x / CELL);
+    var r = Math.floor(y / CELL);
+    if(r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
+
+    var p = pieces[selectedPiece];
+    if(canPlace(p, r, c)){
+      placePiece(p, r, c);
+      pieces.splice(selectedPiece, 1);
+      selectedPiece = -1;
+      checkLines();
+      if(pieces.length < 3) pieces.push(newShape());
+      draw();
+      renderPieces();
+    }
+  });
+
+  function startGame(){
+    resetBoard();
+    fillPieces();
+    score = 0;
+    selectedPiece = -1;
+    document.getElementById('blastScore').textContent = '0 ★';
+    gameActive = true;
+    draw();
+    renderPieces();
+  }
+
+  function getDaily(){
+    if(typeof currentUser === 'undefined' || !currentUser) return null;
+    var p = getProfile(currentUser.login);
+    var today = new Date().toDateString();
+    if(!p.blastDay || p.blastDay !== today){
+      p.blastDay = today;
+      p.blastDaily = 0;
+      saveProfiles();
+    }
+    return p;
+  }
+
+  document.getElementById('openBlast').onclick = function(){
+    if(typeof currentUser === 'undefined' || !currentUser){
+      toast('Войди в аккаунт');
+      return;
+    }
+    var p = getDaily();
+    if(p.blastDaily >= 3000){
+      toast('Лимит 3000★ исчерпан');
+      return;
+    }
+    document.getElementById('sub-blast').classList.add('active');
+    startGame();
+  };
+
+  function endGame(){
+    gameActive = false;
+    var p = getDaily();
+    if(p && score > 0){
+      var remaining = 3000 - p.blastDaily;
+      var earn = Math.min(score, remaining);
+      p.blastDaily += earn;
+      p.stars += earn;
+      if(p.blastDaily >= 3000) p.lastBlast = Date.now();
+      saveProfiles();
+      if(typeof renderProfile === 'function') renderProfile();
+      if(typeof renderShop === 'function') renderShop();
+      if(typeof updateUserUI === 'function') updateUserUI();
+      if(earn > 0) toast('+' + earn + '★');
+    }
+  }
+
+  document.getElementById('backBlast').onclick = function(){
+    document.getElementById('sub-blast').classList.remove('active');
+    endGame();
+  };
+
+  var _origSwitchBlast = switchPage;
+  switchPage = function(page){
+    var b = document.getElementById('sub-blast');
+    if(b && b.classList.contains('active')){
+      b.classList.remove('active');
+      endGame();
+    }
+    _origSwitchBlast(page);
+  };
+
+  setInterval(function(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var cd = document.getElementById('blastCooldown');
+    if(p.lastBlast && (Date.now() - p.lastBlast) < 24*60*60*1000){
+      var left = 24*60*60*1000 - (Date.now() - p.lastBlast);
+      var h = Math.floor(left/3600000);
+      var m = Math.floor((left%3600000)/60000);
+      var s = Math.floor((left%60000)/1000);
+      cd.style.display = 'block';
+      document.getElementById('blastTimer').textContent =
+        String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    } else {
+      cd.style.display = 'none';
+    }
+  }, 1000);
+})();
+/* ================= BLOCK BLAST v2 ================= */
+(function(){
+  /* удаляем старую кнопку, если есть */
+  var oldBtn = document.getElementById('openBlast');
+  if(oldBtn) oldBtn.parentNode.removeChild(oldBtn);
+  var oldView = document.getElementById('sub-blast');
+  if(oldView) oldView.parentNode.removeChild(oldView);
+
+  var intList = document.getElementById('page-interesting').querySelector('.settings-list');
+  if(!intList) return;
+
+  var blastBtn = document.createElement('div');
+  blastBtn.className = 'set-item';
+  blastBtn.id = 'openBlast2';
+  blastBtn.innerHTML =
+    '<div class="set-ico" style="font-size:22px">🧱</div>' +
+    '<div class="set-body">' +
+      '<div class="set-name">Block Blast</div>' +
+      '<div class="set-desc">Тащи фигуры на поле. Линия = +70★</div>' +
+    '</div>' +
+    '<div class="set-arrow">›</div>';
+  intList.appendChild(blastBtn);
+
+  var blastView = document.createElement('div');
+  blastView.className = 'subpage';
+  blastView.id = 'sub-blast2';
+  blastView.innerHTML =
+    '<div class="sub-head">' +
+      '<div class="sub-back" id="backBlast2"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>' +
+      '<div class="sub-title">Block Blast</div>' +
+    '</div>' +
+    '<div class="stars-head" style="padding:6px 0">' +
+      '<div class="stars-big" id="blastScore2">0 ★</div>' +
+      '<div class="stars-big-label">Заработано за игру</div>' +
+    '</div>' +
+    '<div style="position:relative;margin-bottom:10px">' +
+      '<canvas id="blastCanvas2" style="width:100%;background:#1a0f2e;border-radius:16px;touch-action:none;display:block"></canvas>' +
+    '</div>' +
+    '<div id="blastPieces2" style="display:flex;justify-content:space-around;align-items:center;background:#1a0f2e;border-radius:16px;padding:14px 8px;margin-bottom:10px;min-height:90px"></div>' +
+    '<div class="star-cooldown" id="blastCooldown2" style="display:none">Лимит 3000★. Ждать <b id="blastTimer2">24:00:00</b></div>';
+  document.body.appendChild(blastView);
+
+  var canvas = document.getElementById('blastCanvas2');
+  var ctx = canvas.getContext('2d');
+  var COLS = 8, ROWS = 10, CELL = 40;
+  canvas.width = COLS * CELL;
+  canvas.height = ROWS * CELL;
+  canvas.style.height = (ROWS * CELL) + 'px';
+
+  var board, score, gameActive;
+  var pieces = [];
+  var dragPiece = null;
+  var dragIdx = -1;
+  var dragOffsetX = 0, dragOffsetY = 0;
+  var dragPageX = 0, dragPageY = 0;
+  var isDragging = false;
+
+  var shapes = [
+    [[1]],
+    [[1,1]],
+    [[1],[1]],
+    [[1,1],[1,1]],
+    [[1,1,1]],
+    [[1],[1],[1]],
+    [[1,1,1,1]],
+    [[1],[1],[1],[1]],
+    [[1,0],[1,1]],
+    [[0,1],[1,1]],
+    [[1,1],[1,0]],
+    [[1,1],[0,1]],
+    [[1,1,1],[0,1,0]],
+    [[1,1],[1,1],[1,1]]
+  ];
+
+  function newShape(){
+    var s = shapes[Math.floor(Math.random()*shapes.length)];
+    return {
+      shape: s,
+      color: ['#ffd93d','#ff6b6b','#4ecdc4','#a78bfa','#f472b6'][Math.floor(Math.random()*5)],
+      w: s[0].length,
+      h: s.length
+    };
+  }
+
+  function fillPieces(){
+    pieces = [];
+    while(pieces.length < 3) pieces.push(newShape());
+  }
+
+  function resetBoard(){
+    board = [];
+    for(var r=0; r<ROWS; r++){
+      var row = [];
+      for(var c=0; c<COLS; c++) row.push(0);
+      board.push(row);
+    }
+  }
+
+  function drawCell(px, py, color, alpha){
+    ctx.globalAlpha = alpha || 1;
+    ctx.fillStyle = color;
+    ctx.fillRect(px+2, py+2, CELL-4, CELL-4);
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(px+2, py+2, CELL-4, CELL-4);
+    ctx.globalAlpha = 1;
+  }
+
+  function draw(){
+    ctx.fillStyle = '#1a0f2e';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(var r=0; r<ROWS; r++){
+      for(var c=0; c<COLS; c++){
+        if(board[r][c]){
+          drawCell(c*CELL, r*CELL, board[r][c]);
+        } else {
+          ctx.fillStyle = 'rgba(255,255,255,.05)';
+          ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+        }
+      }
+    }
+
+    /* призрак фигуры во время перетаскивания */
+    if(isDragging && dragPiece){
+      var rect = canvas.getBoundingClientRect();
+      var localX = dragPageX - rect.left - dragOffsetX;
+      var localY = dragPageY - rect.top - dragOffsetY;
+      var col = Math.round(localX / CELL);
+      var row = Math.round(localY / CELL);
+
+      var valid = canPlace(dragPiece, row, col);
+      for(var rr=0; rr<dragPiece.h; rr++){
+        for(var cc=0; cc<dragPiece.w; cc++){
+          if(dragPiece.shape[rr][cc]){
+            var px = (col+cc)*CELL;
+            var py = (row+rr)*CELL;
+            ctx.globalAlpha = valid ? 0.6 : 0.25;
+            ctx.fillStyle = dragPiece.color;
+            ctx.fillRect(px+2, py+2, CELL-4, CELL-4);
+            ctx.globalAlpha = 1;
+          }
+        }
+      }
+    }
+  }
+
+  function renderPieces(){
+    var box = document.getElementById('blastPieces2');
+    box.innerHTML = '';
+    pieces.forEach(function(p, i){
+      var wrap = document.createElement('div');
+      wrap.style.cssText = 'padding:8px;border-radius:10px;touch-action:none;' +
+        'border:2px solid ' + (dragIdx === i ? '#3b82f6' : 'transparent') + ';';
+      wrap.dataset.idx = i;
+
+      var grid = document.createElement('div');
+      grid.style.cssText =
+        'display:grid;' +
+        'grid-template-columns:repeat(' + p.w + ',20px);' +
+        'grid-template-rows:repeat(' + p.h + ',20px);' +
+        'gap:2px;';
+      for(var r=0; r<p.h; r++){
+        for(var c=0; c<p.w; c++){
+          var cell = document.createElement('div');
+          if(p.shape[r][c]){
+            cell.style.cssText = 'background:' + p.color + ';border-radius:3px';
+          }
+          grid.appendChild(cell);
+        }
+      }
+      wrap.appendChild(grid);
+
+      wrap.addEventListener('pointerdown', function(e){
+        e.preventDefault();
+        if(!gameActive) return;
+        dragIdx = i;
+        dragPiece = pieces[i];
+        isDragging = true;
+
+        var r2 = wrap.getBoundingClientRect();
+        dragOffsetX = e.clientX - r2.left;
+        dragOffsetY = e.clientY - r2.top;
+        dragPageX = e.clientX;
+        dragPageY = e.clientY;
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        renderPieces();
+        draw();
+      });
+
+      box.appendChild(wrap);
+    });
+  }
+
+  function onMove(e){
+    dragPageX = e.clientX;
+    dragPageY = e.clientY;
+    draw();
+  }
+
+  function onUp(e){
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+
+    if(!dragPiece){ isDragging = false; return; }
+
+    var rect = canvas.getBoundingClientRect();
+    var localX = e.clientX - rect.left - dragOffsetX;
+    var localY = e.clientY - rect.top - dragOffsetY;
+    var col = Math.round(localX / CELL);
+    var row = Math.round(localY / CELL);
+
+    if(canPlace(dragPiece, row, col)){
+      placePiece(dragPiece, row, col);
+      pieces.splice(dragIdx, 1);
+      if(pieces.length < 3) pieces.push(newShape());
+      checkLines();
+    }
+
+    dragPiece = null;
+    dragIdx = -1;
+    isDragging = false;
+    draw();
+    renderPieces();
+  }
+
+  function canPlace(p, row, col){
+    if(!p) return false;
+    if(row < 0 || col < 0) return false;
+    if(row + p.h > ROWS) return false;
+    if(col + p.w > COLS) return false;
+    for(var r=0; r<p.h; r++){
+      for(var c=0; c<p.w; c++){
+        if(p.shape[r][c] && board[row+r][col+c]) return false;
+      }
+    }
+    return true;
+  }
+
+  function placePiece(p, row, col){
+    for(var r=0; r<p.h; r++){
+      for(var c=0; c<p.w; c++){
+        if(p.shape[r][c]) board[row+r][col+c] = p.color;
+      }
+    }
+  }
+
+  /* --- проверка линий и взрыв --- */
+  function checkLines(){
+    var cleared = 0;
+    /* собираем линии для взрыва */
+    var rowsToClear = [];
+    var colsToClear = [];
+
+    for(var r=0; r<ROWS; r++){
+      var full = true;
+      for(var c=0; c<COLS; c++){
+        if(!board[r][c]){ full = false; break; }
+      }
+      if(full) rowsToClear.push(r);
+    }
+    for(var c2=0; c2<COLS; c2++){
+      var full2 = true;
+      for(var r2=0; r2<ROWS; r2++){
+        if(!board[r2][c2]){ full2 = false; break; }
+      }
+      if(full2) colsToClear.push(c2);
+    }
+
+    cleared = rowsToClear.length + colsToClear.length;
+
+    if(cleared > 0){
+      /* очистка */
+      rowsToClear.forEach(function(r){
+        for(var c=0; c<COLS; c++) board[r][c] = 0;
+      });
+      colsToClear.forEach(function(c){
+        for(var r=0; r<ROWS; r++) board[r][c] = 0;
+      });
+
+      score += cleared * 70;
+      document.getElementById('blastScore2').textContent = score + ' ★';
+      if(typeof toast === 'function') toast('+' + (cleared * 70) + '★');
+    }
+  }
+
+  function startGame(){
+    resetBoard();
+    fillPieces();
+    score = 0;
+    dragIdx = -1;
+    dragPiece = null;
+    isDragging = false;
+    document.getElementById('blastScore2').textContent = '0 ★';
+    gameActive = true;
+    draw();
+    renderPieces();
+  }
+
+  function getDaily(){
+    if(typeof currentUser === 'undefined' || !currentUser) return null;
+    var p = getProfile(currentUser.login);
+    var today = new Date().toDateString();
+    if(!p.blastDay || p.blastDay !== today){
+      p.blastDay = today;
+      p.blastDaily = 0;
+      saveProfiles();
+    }
+    return p;
+  }
+
+  function endGame(){
+    gameActive = false;
+    var p = getDaily();
+    if(p && score > 0){
+      var remaining = 3000 - p.blastDaily;
+      var earn = Math.min(score, remaining);
+      p.blastDaily += earn;
+      p.stars += earn;
+      if(p.blastDaily >= 3000) p.lastBlast = Date.now();
+      saveProfiles();
+      if(typeof renderProfile === 'function') renderProfile();
+      if(typeof renderShop === 'function') renderShop();
+      if(typeof updateUserUI === 'function') updateUserUI();
+      if(earn > 0) toast('+' + earn + '★');
+    }
+  }
+
+  document.getElementById('openBlast2').onclick = function(){
+    if(typeof currentUser === 'undefined' || !currentUser){
+      toast('Войди в аккаунт');
+      return;
+    }
+    var p = getDaily();
+    if(p.blastDaily >= 3000){
+      toast('Лимит 3000★ исчерпан');
+      return;
+    }
+    document.getElementById('sub-blast2').classList.add('active');
+    startGame();
+  };
+
+  document.getElementById('backBlast2').onclick = function(){
+    document.getElementById('sub-blast2').classList.remove('active');
+    endGame();
+  };
+
+  var _origSwitchBlast2 = switchPage;
+  switchPage = function(page){
+    var b = document.getElementById('sub-blast2');
+    if(b && b.classList.contains('active')){
+      b.classList.remove('active');
+      endGame();
+    }
+    _origSwitchBlast2(page);
+  };
+
+  setInterval(function(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var cd = document.getElementById('blastCooldown2');
+    if(p.lastBlast && (Date.now() - p.lastBlast) < 24*60*60*1000){
+      var left = 24*60*60*1000 - (Date.now() - p.lastBlast);
+      var h = Math.floor(left/3600000);
+      var m = Math.floor((left%3600000)/60000);
+      var s = Math.floor((left%60000)/1000);
+      cd.style.display = 'block';
+      document.getElementById('blastTimer2').textContent =
+        String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    } else {
+      cd.style.display = 'none';
+    }
+  }, 1000);
+})();
+/* ================= ЦВЕТ НИКА + РАМКИ ================= */
+(function(){
+  /* --- Данные --- */
+  var NICK_COLORS = [
+    { id:'default', name:'Обычный',  color:'#f0f0f0', price:0 },
+    { id:'blue1',   name:'Голубой',  color:'#60a5fa', price:1 },
+    { id:'black1',  name:'Чёрный',   color:'#888888', price:30 },
+    { id:'green1',  name:'Зелёный',  color:'#34d399', price:469 },
+    { id:'yellow1', name:'Жёлтый',   color:'#fbbf24', price:700 },
+    { id:'blue2',   name:'Синий',    color:'#3b82f6', price:10000 },
+    { id:'red1',    name:'Красный',  color:'#ef4444', price:34999 },
+    { id:'orange1', name:'Оранжевый',color:'#f97316', price:57999 }
+  ];
+
+  var FRAMES = [
+    { id:'none',   name:'Нет',        icon:'',  price:0,    style:'' },
+    { id:'ph',     name:'Пх',         icon:'🔥', price:960,  style:'linear-gradient(135deg,#ff4500,#ff8c00)' },
+    { id:'sakura', name:'Сакура',     icon:'🌸', price:1500, style:'linear-gradient(135deg,#ff9ec4,#ffc4dc)' },
+    { id:'snow',   name:'Снежная',    icon:'❄️', price:1500, style:'linear-gradient(135deg,#9ecbff,#cce4ff)' },
+    { id:'star',   name:'Звёздная',   icon:'⭐', price:3000, style:'linear-gradient(135deg,#fbbf24,#f59e0b)' },
+    { id:'diamond',name:'Алмазная',   icon:'💎', price:5000, style:'linear-gradient(135deg,#22d3ee,#0891b2)' },
+    { id:'royal',  name:'Королевская',icon:'👑', price:15000,style:'linear-gradient(135deg,#a855f7,#7c3aed)' },
+    { id:'rainbow',name:'Радужная',   icon:'🌈', price:25000,style:'linear-gradient(90deg,#ff0000,#ff8c00,#ffd700,#00ff00,#00bfff,#8a2be2)' }
+  ];
+
+  /* --- Кнопки в профиле --- */
+  var btnColor = document.createElement('div');
+  btnColor.className = 'profile-logout';
+  btnColor.style.cssText = 'background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6;margin-top:10px';
+  btnColor.textContent = '🎨 Цвет ника';
+  document.getElementById('profileView').appendChild(btnColor);
+
+  var btnFrame = document.createElement('div');
+  btnFrame.className = 'profile-logout';
+  btnFrame.style.cssText = 'background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.3);color:#a855f7;margin-top:10px';
+  btnFrame.textContent = '🖼️ Рамка аватарки';
+  document.getElementById('profileView').appendChild(btnFrame);
+
+  /* --- Экран цветов --- */
+  var colorView = document.createElement('div');
+  colorView.className = 'auth';
+  colorView.id = 'colorView';
+  colorView.innerHTML =
+    '<div class="auth-logo">🎨</div>' +
+    '<div class="auth-title">Цвет ника</div>' +
+    '<div class="auth-sub">Выбери цвет для своего имени</div>' +
+    '<div id="colorList" style="width:100%"></div>' +
+    '<button class="auth-btn guest" id="colorBack">Назад</button>';
+  document.body.appendChild(colorView);
+
+  /* --- Экран рамок --- */
+  var frameView = document.createElement('div');
+  frameView.className = 'auth';
+  frameView.id = 'frameView';
+  frameView.innerHTML =
+    '<div class="auth-logo">🖼️</div>' +
+    '<div class="auth-title">Рамка аватарки</div>' +
+    '<div class="auth-sub">Выбери рамку для профиля</div>' +
+    '<div id="frameList" style="width:100%"></div>' +
+    '<button class="auth-btn guest" id="frameBack">Назад</button>';
+  document.body.appendChild(frameView);
+
+  /* --- Отрисовка цветов --- */
+  function renderColors(){
+    var list = document.getElementById('colorList');
+    list.innerHTML = '';
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    if(!p.ownedColors) p.ownedColors = ['default'];
+    if(!p.nickColor) p.nickColor = 'default';
+
+    NICK_COLORS.forEach(function(c){
+      var owned = p.ownedColors.indexOf(c.id) >= 0;
+      var active = p.nickColor === c.id;
+
+      var d = document.createElement('div');
+      d.className = 'auth-field';
+      d.style.cssText = 'cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px 16px;' +
+        (active ? 'border-color:' + c.color + ';' : '');
+      d.innerHTML =
+        '<div style="width:22px;height:22px;border-radius:50%;background:' + c.color + ';border:2px solid #fff3"></div>' +
+        '<div style="flex:1;color:' + c.color + ';font-weight:600">' + c.name + '</div>' +
+        (owned
+          ? '<div style="color:var(--gold);font-size:12px">' + (active ? '✓ Активно' : 'Выбрать') + '</div>'
+          : '<div style="color:var(--gold);font-size:13px;font-weight:700">' + c.price + '★</div>');
+
+      d.onclick = function(){
+        if(owned){
+          p.nickColor = c.id;
+          saveProfiles();
+          updateNickColor();
+          renderColors();
+          if(typeof toast === 'function') toast('Цвет: ' + c.name);
+        } else {
+          if(p.stars < c.price){ toast('Не хватает ' + c.price + '★'); return; }
+          if(confirm('Купить цвет «' + c.name + '» за ' + c.price + '★?')){
+            p.stars -= c.price;
+            p.ownedColors.push(c.id);
+            p.nickColor = c.id;
+            saveProfiles();
+            updateNickColor();
+            renderColors();
+            if(typeof renderProfile === 'function') renderProfile();
+            if(typeof updateUserUI === 'function') updateUserUI();
+            toast('Куплено: ' + c.name);
+          }
+        }
+      };
+      list.appendChild(d);
+    });
+  }
+
+  /* --- Отрисовка рамок --- */
+  function renderFrames(){
+    var list = document.getElementById('frameList');
+    list.innerHTML = '';
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    if(!p.ownedFrames) p.ownedFrames = ['none'];
+    if(!p.frame) p.frame = 'none';
+
+    FRAMES.forEach(function(f){
+      var owned = p.ownedFrames.indexOf(f.id) >= 0;
+      var active = p.frame === f.id;
+
+      var d = document.createElement('div');
+      d.className = 'auth-field';
+      d.style.cssText = 'cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px 16px;' +
+        (active ? 'border-color:#a855f7;' : '');
+      d.innerHTML =
+        '<div style="width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;background:' + (f.style || '#ffffff12') + '">' + f.icon + '</div>' +
+        '<div style="flex:1;font-weight:600">' + f.name + '</div>' +
+        (owned
+          ? '<div style="color:var(--gold);font-size:12px">' + (active ? '✓ Активно' : 'Выбрать') + '</div>'
+          : '<div style="color:var(--gold);font-size:13px;font-weight:700">' + f.price + '★</div>');
+
+      d.onclick = function(){
+        if(owned){
+          p.frame = f.id;
+          saveProfiles();
+          updateFrame();
+          renderFrames();
+          if(typeof toast === 'function') toast('Рамка: ' + f.name);
+        } else {
+          if(p.stars < f.price){ toast('Не хватает ' + f.price + '★'); return; }
+          if(confirm('Купить рамку «' + f.name + '» за ' + f.price + '★?')){
+            p.stars -= f.price;
+            p.ownedFrames.push(f.id);
+            p.frame = f.id;
+            saveProfiles();
+            updateFrame();
+            renderFrames();
+            if(typeof renderProfile === 'function') renderProfile();
+            if(typeof updateUserUI === 'function') updateUserUI();
+            toast('Куплено: ' + f.name);
+          }
+        }
+      };
+      list.appendChild(d);
+    });
+  }
+
+  /* --- Применение цвета --- */
+  function updateNickColor(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var c = NICK_COLORS.find(function(x){ return x.id === p.nickColor; });
+    if(!c) c = NICK_COLORS[0];
+
+    var uName = document.getElementById('uName');
+    if(uName) uName.style.color = c.color;
+    var pName = document.getElementById('profileName');
+    if(pName) pName.style.color = c.color;
+  }
+
+  /* --- Применение рамки --- */
+  function updateFrame(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var f = FRAMES.find(function(x){ return x.id === p.frame; });
+    if(!f || f.id === 'none'){
+      var a1 = document.getElementById('ava');
+      var a2 = document.getElementById('profileAva');
+      if(a1) a1.style.background = '';
+      if(a2) a2.style.background = '';
+      return;
+    }
+    var a1 = document.getElementById('ava');
+    var a2 = document.getElementById('profileAva');
+    if(a1){ a1.style.background = f.style; a1.style.padding = '3px'; }
+    if(a2){ a2.style.background = f.style; a2.style.padding = '3px'; }
+  }
+
+  /* --- Открытие --- */
+  document.getElementById('colorBack').onclick = function(){
+    document.getElementById('colorView').classList.remove('on');
+  };
+  document.getElementById('frameBack').onclick = function(){
+    document.getElementById('frameView').classList.remove('on');
+  };
+  btnColor.onclick = function(){
+    if(typeof currentUser === 'undefined' || !currentUser){ toast('Войди в аккаунт'); return; }
+    document.getElementById('colorView').classList.add('on');
+    renderColors();
+  };
+  btnFrame.onclick = function(){
+    if(typeof currentUser === 'undefined' || !currentUser){ toast('Войди в аккаунт'); return; }
+    document.getElementById('frameView').classList.add('on');
+    renderFrames();
+  };
+
+  /* --- Применяем при старте --- */
+  setTimeout(function(){ updateNickColor(); updateFrame(); }, 500);
+
+  /* --- Выход через вкладки --- */
+  var _origSwitch6 = switchPage;
+  switchPage = function(page){
+    var c = document.getElementById('colorView');
+    var f = document.getElementById('frameView');
+    if(c) c.classList.remove('on');
+    if(f) f.classList.remove('on');
+    _origSwitch6(page);
+  };
+})();
+/* ================= ЕЖЕДНЕВНАЯ НАГРАДА (МИНИ-ТАБЛИЦА) ================= */
+(function(){
+  if(typeof getProfile !== 'function') return;
+
+  function buildDailyCard(){
+    var profileView = document.getElementById('profileView');
+    if(!profileView) return;
+
+    var card = document.createElement('div');
+    card.id = 'dailyCard';
+    card.style.cssText = 'background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin-top:16px;display:flex;align-items:center;gap:12px';
+    card.innerHTML =
+      '<div style="font-size:28px">🎁</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:14px;font-weight:700;margin-bottom:4px">Ежедневная награда</div>' +
+        '<div id="dailyTimer" style="font-size:12px;color:var(--mut)">—</div>' +
+      '</div>' +
+      '<button id="dailyClaimBtn" style="padding:10px 16px;border:none;border-radius:12px;background:var(--gold);color:#000;font-size:13px;font-weight:700;cursor:pointer">Забрать</button>';
+
+    /* вставляем после таблицы с инфо профиля */
+    var info = profileView.querySelector('.profile-info');
+    if(info && info.parentNode === profileView){
+      info.parentNode.insertBefore(card, info.nextSibling);
+    } else {
+      profileView.appendChild(card);
+    }
+  }
+
+  function updateDailyCard(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var today = new Date().toDateString();
+    var btn = document.getElementById('dailyClaimBtn');
+    var timer = document.getElementById('dailyTimer');
+    if(!btn || !timer) return;
+
+    if(p.lastDailyDate === today){
+      /* уже забрал — показываем отсчёт до следующих суток */
+      var now = new Date();
+      var tomorrow = new Date(now);
+      tomorrow.setHours(24, 0, 0, 0);
+      var left = tomorrow - now;
+      var h = Math.floor(left / 3600000);
+      var m = Math.floor((left % 3600000) / 60000);
+      var s = Math.floor((left % 60000) / 1000);
+      timer.textContent = 'Следующая через ' + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+      btn.textContent = '✓ Получено';
+      btn.style.background = 'rgba(255,255,255,.1)';
+      btn.style.color = 'var(--mut)';
+      btn.disabled = true;
+    } else {
+      var streak = p.dailyStreak || 0;
+      var day = (streak % 7) + 1;
+      var reward = 50 + (day === 7 ? 500 : 0);
+      timer.textContent = 'День ' + day + ' / 7 · +' + reward + '★';
+      btn.textContent = 'Забрать';
+      btn.style.background = 'var(--gold)';
+      btn.style.color = '#000';
+      btn.disabled = false;
+    }
+  }
+
+  buildDailyCard();
+  setInterval(updateDailyCard, 1000);
+
+  document.addEventListener('click', function(e){
+    if(e.target && e.target.id === 'dailyClaimBtn'){
+      if(typeof currentUser === 'undefined' || !currentUser) return;
+      var p = getProfile(currentUser.login);
+      var today = new Date().toDateString();
+      if(p.lastDailyDate === today) return;
+
+      var streak = p.dailyStreak || 0;
+      var day = (streak % 7) + 1;
+      var reward = 50;
+      var bonus = (day === 7) ? 500 : 0;
+
+      p.stars += reward + bonus;
+      if(day === 7) p.dailyStreak = 0;
+      else p.dailyStreak = (p.dailyStreak || 0) + 1;
+      p.lastDailyDate = today;
+      saveProfiles();
+      if(typeof renderProfile === 'function') renderProfile();
+      if(typeof renderShop === 'function') renderShop();
+      if(typeof updateUserUI === 'function') updateUserUI();
+      if(typeof toast === 'function') toast('+' + (reward + bonus) + '★');
+      updateDailyCard();
+    }
+  });
+
+  setInterval(function(){
+    if(document.getElementById('profileView').classList.contains('on')){
+      updateDailyCard();
+    }
+  }, 1000);
+})();
+
+/* ================= КЛИКЕР (ЛИМИТ 2500★ В ДЕНЬ) ================= */
+(function(){
+  var intList = document.getElementById('page-interesting').querySelector('.settings-list');
+  if(!intList) return;
+
+  var clickBtn = document.createElement('div');
+  clickBtn.className = 'set-item';
+  clickBtn.id = 'openClicker';
+  clickBtn.innerHTML =
+    '<div class="set-ico" style="font-size:22px">🖱️</div>' +
+    '<div class="set-body">' +
+      '<div class="set-name">Кликер</div>' +
+      '<div class="set-desc">Тапай логотип — лимит 2500★ в день</div>' +
+    '</div>' +
+    '<div class="set-arrow">›</div>';
+  intList.appendChild(clickBtn);
+
+  var cView = document.createElement('div');
+  cView.className = 'subpage';
+  cView.id = 'sub-clicker';
+  cView.innerHTML =
+    '<div class="sub-head">' +
+      '<div class="sub-back" id="backClicker"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></div>' +
+      '<div class="sub-title">Кликер</div>' +
+    '</div>' +
+    '<div class="stars-head" style="padding:6px 0">' +
+      '<div class="stars-big" id="clickScore">0 ★</div>' +
+      '<div class="stars-big-label">Заработано за сессию</div>' +
+    '</div>' +
+    '<div style="position:relative;display:flex;justify-content:center;align-items:center;margin:20px 0">' +
+      '<div id="clickerBtn" style="position:relative;width:200px;height:200px;border-radius:50%;background:linear-gradient(135deg,#1e3a5f,#0a1929);border:3px solid var(--blue);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;box-shadow:0 0 40px rgba(59,130,246,.4)">' +
+        '<div style="color:#fff;font-size:22px;font-weight:800;letter-spacing:2px;text-align:center;line-height:1.2">KORABLIK<br>VISUALS</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="star-cooldown" id="clickerLimit" style="display:none">Лимит 2500★ исчерпан. Ждать <b id="clickerTimer">24:00:00</b></div>' +
+    '<div class="exchange-box">' +
+      '<div class="exchange-title">Как играть</div>' +
+      '<div class="exchange-desc">Тапай по логотипу. +1★ за тап. Лимит 2500★ в день. Выход — звёзды зачислятся в профиль.</div>' +
+    '</div>';
+  document.body.appendChild(cView);
+
+  var clickerBtn = document.getElementById('clickerBtn');
+  var clickScore = 0;
+
+  function playAnim(x, y){
+    var type = Math.floor(Math.random() * 4);
+    var el = document.createElement('div');
+    el.style.cssText = 'position:absolute;pointer-events:none;z-index:10';
+
+    if(type === 0){
+      el.style.cssText += ';left:' + (x-30) + 'px;top:' + (y-30) + 'px;width:60px;height:60px;border:3px solid #fff;border-radius:50%;animation:clickRing .6s ease-out forwards';
+    } else if(type === 1){
+      for(var i=0;i<6;i++){
+        var dot = document.createElement('div');
+        var angle = (Math.PI * 2 / 6) * i;
+        dot.style.cssText = 'position:absolute;left:' + x + 'px;top:' + y + 'px;width:8px;height:8px;background:#fbbf24;border-radius:50%;animation:clickDot .5s ease-out forwards';
+        dot.style.setProperty('--dx', Math.cos(angle) * 50 + 'px');
+        dot.style.setProperty('--dy', Math.sin(angle) * 50 + 'px');
+        clickerBtn.appendChild(dot);
+        setTimeout(function(){ if(dot.parentNode) dot.parentNode.removeChild(dot); }, 600);
+      }
+      return;
+    } else if(type === 2){
+      el.style.cssText += ';left:0;top:0;width:100%;height:100%;background:radial-gradient(circle,rgba(255,255,255,.4),transparent 70%);border-radius:50%;animation:clickPulse .5s ease-out forwards';
+    } else {
+      el.style.cssText += ';left:' + x + 'px;top:' + y + 'px;width:4px;height:4px;background:#4ecdc4;border-radius:50%;box-shadow:0 0 12px #4ecdc4;animation:clickRing .4s ease-out forwards';
+    }
+
+    clickerBtn.appendChild(el);
+    setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, 700);
+  }
+
+  function getClickerDaily(){
+    if(typeof currentUser === 'undefined' || !currentUser) return null;
+    var p = getProfile(currentUser.login);
+    var today = new Date().toDateString();
+    if(!p.clickerDay || p.clickerDay !== today){
+      p.clickerDay = today;
+      p.clickerDaily = 0;
+      saveProfiles();
+    }
+    return p;
+  }
+
+  clickerBtn.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    var p = getClickerDaily();
+    if(!p) return;
+
+    if(p.clickerDaily >= 2500){
+      if(typeof toast === 'function') toast('Лимит 2500★ исчерпан');
+      return;
+    }
+
+    var rect = clickerBtn.getBoundingClientRect();
+    var x = e.clientX - rect.left;
+    var y = e.clientY - rect.top;
+    clickScore += 1;
+    document.getElementById('clickScore').textContent = clickScore + ' ★';
+    playAnim(x, y);
+    if(navigator.vibrate) navigator.vibrate(10);
+
+    /* проверка на лимит во время игры */
+    if(p.clickerDaily + clickScore >= 2500){
+      var allowed = 2500 - p.clickerDaily;
+      if(clickScore > allowed) clickScore = allowed;
+      document.getElementById('clickScore').textContent = clickScore + ' ★';
+      endClick();
+      document.getElementById('clickerLimit').style.display = 'block';
+    }
+  });
+
+  var style = document.createElement('style');
+  style.textContent =
+    '@keyframes clickRing{0%{transform:scale(.5);opacity:1}100%{transform:scale(2);opacity:0}}' +
+    '@keyframes clickDot{0%{transform:translate(0,0);opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}' +
+    '@keyframes clickPulse{0%{opacity:1;transform:scale(.8)}100%{opacity:0;transform:scale(1.4)}}';
+  document.head.appendChild(style);
+
+  document.getElementById('openClicker').onclick = function(){
+    if(typeof currentUser === 'undefined' || !currentUser){ toast('Войди в аккаунт'); return; }
+    var p = getClickerDaily();
+    if(p.clickerDaily >= 2500){
+      toast('Лимит 2500★ исчерпан на сегодня');
+      return;
+    }
+    document.getElementById('sub-clicker').classList.add('active');
+    clickScore = 0;
+    document.getElementById('clickScore').textContent = '0 ★';
+    document.getElementById('clickerLimit').style.display = 'none';
+    if(typeof pushHistory === 'function') pushHistory();
+  };
+
+  function endClick(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    if(clickScore > 0){
+      var p = getClickerDaily();
+      if(!p) return;
+      var remaining = 2500 - p.clickerDaily;
+      var earn = Math.min(clickScore, remaining);
+      p.clickerDaily += earn;
+      p.stars += earn;
+      if(p.clickerDaily >= 2500) p.lastClicker = Date.now();
+      saveProfiles();
+      if(typeof renderProfile === 'function') renderProfile();
+      if(typeof renderShop === 'function') renderShop();
+      if(typeof updateUserUI === 'function') updateUserUI();
+      if(typeof toast === 'function') toast('+' + earn + '★');
+      clickScore = 0;
+    }
+  }
+
+  document.getElementById('backClicker').onclick = function(){
+    document.getElementById('sub-clicker').classList.remove('active');
+    endClick();
+  };
+
+  var _origSwitchClick = switchPage;
+  switchPage = function(page){
+    var cv = document.getElementById('sub-clicker');
+    if(cv && cv.classList.contains('active')){
+      cv.classList.remove('active');
+      endClick();
+    }
+    _origSwitchClick(page);
+  };
+
+  setInterval(function(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var cd = document.getElementById('clickerLimit');
+    if(p.lastClicker && (Date.now() - p.lastClicker) < 24*60*60*1000){
+      var left = 24*60*60*1000 - (Date.now() - p.lastClicker);
+      var h = Math.floor(left/3600000);
+      var m = Math.floor((left%3600000)/60000);
+      var s = Math.floor((left%60000)/1000);
+      cd.style.display = 'block';
+      document.getElementById('clickerTimer').textContent =
+        String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    } else {
+      cd.style.display = 'none';
+    }
+  }, 1000);
+})();
+/* ================= ПРОИГРЫШ BLOCK BLAST ================= */
+(function(){
+  /* ждём, пока игрок зайдёт в Blast */
+  function checkBlastLose(){
+    var blastView = document.getElementById('sub-blast3') || document.getElementById('sub-blast');
+    if(!blastView || !blastView.classList.contains('active')) return;
+    if(typeof pieces === 'undefined' || typeof board === 'undefined') return;
+    if(typeof gameActive === 'undefined' || !gameActive) return;
+    if(typeof loseShown !== 'undefined' && loseShown) return;
+
+    var canPlaceAny = false;
+    for(var pi=0; pi<pieces.length; pi++){
+      var p = pieces[pi];
+      for(var r=0; r<=(10 - p.h); r++){
+        for(var c=0; c<=(8 - p.w); c++){
+          if(canPlaceCheck(p, r, c)){ canPlaceAny = true; break; }
+        }
+        if(canPlaceAny) break;
+      }
+      if(canPlaceAny) break;
+    }
+
+    if(!canPlaceAny) showLoseScreen();
+  }
+
+  function canPlaceCheck(p, row, col){
+    if(!p) return false;
+    if(row < 0 || col < 0) return false;
+    if(row + p.h > 10) return false;
+    if(col + p.w > 8) return false;
+    for(var r=0; r<p.h; r++){
+      for(var c=0; c<p.w; c++){
+        if(p.shape[r][c] && board[row+r][col+c]) return false;
+      }
+    }
+    return true;
+  }
+
+  var loseShown2 = false;
+
+  function showLoseScreen(){
+    if(loseShown2) return;
+    loseShown2 = true;
+    if(typeof gameActive !== 'undefined') gameActive = false;
+
+    var prof = getProfile(currentUser.login);
+    var penalty = 450;
+    var earn = (typeof score !== 'undefined') ? score : 0;
+    var lostFromBalance = 0;
+
+    if(earn >= penalty){
+      earn -= penalty;
+    } else {
+      var need = penalty - earn;
+      earn = 0;
+      if(prof.stars >= need){
+        prof.stars -= need;
+        lostFromBalance = need;
+      } else {
+        lostFromBalance = prof.stars;
+        prof.stars = 0;
+      }
+    }
+
+    var remaining = 3000 - (prof.blastDaily || 0);
+    var earnCapped = Math.min(earn, remaining);
+    prof.stars += earnCapped;
+    prof.blastDaily = (prof.blastDaily || 0) + earnCapped;
+    if(prof.blastDaily >= 3000) prof.lastBlast = Date.now();
+    saveProfiles();
+    if(typeof renderProfile === 'function') renderProfile();
+    if(typeof renderShop === 'function') renderShop();
+    if(typeof updateUserUI === 'function') updateUserUI();
+
+    var ov = document.createElement('div');
+    ov.className = 'ov on';
+    ov.style.zIndex = 8000;
+    ov.innerHTML =
+      '<div class="mod" style="text-align:center">' +
+        '<h3 style="color:#ef4444;font-size:26px;font-weight:800;margin-bottom:16px">ВЫ ПРОИГРАЛИ</h3>' +
+        '<div style="font-size:14px;color:var(--mut);margin-bottom:16px">' +
+          (earnCapped > 0 ? 'Выигрыш: +' + earnCapped + '★ (штраф 450★)' : 'Выигрыш: 0★ (штраф 450★)') +
+          (lostFromBalance > 0 ? '<br>Списано из баланса: -' + lostFromBalance + '★' : '') +
+        '</div>' +
+        '<button class="ok" id="loseCloseFinal" style="width:100%;padding:14px;border:none;border-radius:14px;background:#ef4444;color:#fff;font-size:15px;font-weight:700;cursor:pointer">Закрыть</button>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    document.getElementById('loseCloseFinal').onclick = function(){
+      document.body.removeChild(ov);
+      var b1 = document.getElementById('sub-blast3');
+      if(b1) b1.classList.remove('active');
+      var b2 = document.getElementById('sub-blast');
+      if(b2) b2.classList.remove('active');
+      var b3 = document.getElementById('sub-blast2');
+      if(b3) b3.classList.remove('active');
+      loseShown2 = false;
+    };
+  }
+
+  /* проверка каждые 800мс */
+  setInterval(function(){
+    if(document.getElementById('sub-blast3') && document.getElementById('sub-blast3').classList.contains('active')){
+      checkBlastLose();
+    } else if(document.getElementById('sub-blast') && document.getElementById('sub-blast').classList.contains('active')){
+      checkBlastLose();
+    } else {
+      loseShown2 = false;
+    }
+  }, 800);
+})();
+/* ================= ПОЛКИ-ЗАГОЛОВКИ ================= */
+(function(){
+  var style = document.createElement('style');
+  style.textContent =
+    '.shelf-title{' +
+      'font-size:13px;' +
+      'font-weight:700;' +
+      'color:var(--accent2);' +
+      'text-transform:uppercase;' +
+      'letter-spacing:1px;' +
+      'padding:14px 6px 8px;' +
+      'opacity:.7;' +
+    '}';
+  document.head.appendChild(style);
+
+  /* --- Настройки: "Внешний вид" --- */
+  var settingsList = document.getElementById('page-settings').querySelector('.settings-list');
+  if(settingsList && !settingsList.querySelector('.shelf-title')){
+    var sTitle = document.createElement('div');
+    sTitle.className = 'shelf-title';
+    sTitle.textContent = 'Внешний вид:';
+    settingsList.insertBefore(sTitle, settingsList.firstChild);
+  }
+
+  /* --- Интересное: "Игры и звёзды" --- */
+  var intList = document.getElementById('page-interesting').querySelector('.settings-list');
+  if(intList && !intList.querySelector('.shelf-title')){
+    var iTitle = document.createElement('div');
+    iTitle.className = 'shelf-title';
+    iTitle.textContent = 'Игры и звёзды:';
+    intList.insertBefore(iTitle, intList.firstChild);
+  }
+})();
+/* ================= НОВЫЕ АНИМЕ-ТЕМЫ ================= */
+(function(){
+  /* Данные новых тем */
+  var NEW_THEMES = {
+    anime_t: {
+      price: 17000,
+      name: 'Аниме-тянка',
+      desc: 'Розово-фиолетовая тема',
+      vars: {
+        '--bg':'#1a0f1f','--card':'#241628','--card2':'#2c1c30',
+        '--line':'#3d2a40','--accent':'#ff9ec4','--accent2':'#ffc4dc',
+        '--txt':'#fce8f0','--mut':'#a07890'
+      },
+      fx: 'anime_t'
+    },
+    anime_dn: {
+      price: 828000,
+      name: 'Тетрадь смерти',
+      desc: 'Красно-чёрная тема',
+      vars: {
+        '--bg':'#0a0000','--card':'#140505','--card2':'#1c0a0a',
+        '--line':'#3a1515','--accent':'#ef4444','--accent2':'#f87171',
+        '--txt':'#f0e8e8','--mut':'#a06060'
+      },
+      fx: 'anime_dn'
+    },
+    cyber: {
+      price: 2000,
+      name: 'Киберпанк',
+      desc: 'Неон и дождь',
+      vars: {
+        '--bg':'#0a0014','--card':'#140524','--card2':'#1c0a30',
+        '--line':'#3a1550','--accent':'#ff00aa','--accent2':'#00ffff',
+        '--txt':'#f0e8ff','--mut':'#8a60a0'
+      },
+      fx: 'cyber'
+    }
+  };
+
+  /* Добавляем в THEMES */
+  if(typeof THEMES !== 'undefined'){
+    Object.keys(NEW_THEMES).forEach(function(k){
+      THEMES[k] = { vars: NEW_THEMES[k].vars, fx: NEW_THEMES[k].fx };
+    });
+  }
+
+  /* Создаём карточки в подстранице тем */
+  var subTheme = document.getElementById('sub-theme');
+  if(!subTheme) return;
+
+  Object.keys(NEW_THEMES).forEach(function(key){
+    var t = NEW_THEMES[key];
+
+    var card = document.createElement('div');
+    card.className = 'theme-card';
+    card.dataset.theme = key;
+    card.innerHTML =
+      '<div class="theme-prev" style="background:' + t.vars['--bg'] + '"></div>' +
+      '<div class="theme-body">' +
+        '<div class="theme-name">' + t.name + ' <span style="color:var(--gold);font-size:11px">' + t.price + '★</span></div>' +
+        '<div class="theme-desc">' + t.desc + '</div>' +
+      '</div>' +
+      '<div class="theme-check"></div>';
+
+    /* проверка покупки */
+    card.onclick = function(){
+      if(typeof currentUser === 'undefined' || !currentUser){
+        if(typeof toast === 'function') toast('Войди в аккаунт');
+        return;
+      }
+      var p = getProfile(currentUser.login);
+      if(!p.ownedThemes) p.ownedThemes = [];
+
+      var owned = currentUser.admin || p.ownedThemes.indexOf(key) >= 0;
+
+      if(owned){
+        /* применяем тему */
+        applyTheme(key);
+        if(typeof toast === 'function') toast('Тема: ' + t.name);
+      } else {
+        if(p.stars < t.price){
+          if(typeof toast === 'function') toast('Не хватает ' + t.price + '★');
+          return;
+        }
+        if(confirm('Купить тему «' + t.name + '» за ' + t.price + '★?')){
+          p.stars -= t.price;
+          p.ownedThemes.push(key);
+          saveProfiles();
+          applyTheme(key);
+          if(typeof renderProfile === 'function') renderProfile();
+          if(typeof renderShop === 'function') renderShop();
+          if(typeof updateUserUI === 'function') updateUserUI();
+          if(typeof toast === 'function') toast('Куплено: ' + t.name);
+        }
+      }
+    };
+
+    subTheme.appendChild(card);
+  });
+
+  /* --- Фоны для новых тем --- */
+  var origDrawNew = window.drawFx;
+  if(typeof origDrawNew !== 'function') return;
+
+  var lettersCache = null;
+  var starsCache = null;
+
+  function buildLetters(){
+    var letters = [];
+    for(var i=0;i<40;i++){
+      letters.push({
+        x: Math.random(),
+        y: Math.random(),
+        s: 10 + Math.random()*20,
+        v: 0.001 + Math.random()*0.003
+      });
+    }
+    lettersCache = letters;
+  }
+
+  function buildStars(){
+    var stars = [];
+    for(var i=0;i<80;i++){
+      stars.push({
+        x: Math.random(),
+        y: Math.random(),
+        r: 0.5 + Math.random()*1.5,
+        a: 0.3 + Math.random()*0.7
+      });
+    }
+    starsCache = stars;
+  }
+
+  window.drawFx = function(){
+    var W = window.innerWidth, H = window.innerHeight;
+
+    if(fxType === 'anime_t'){
+      /* розовый градиент + лепестки */
+      var g = fx.createLinearGradient(0,0,0,H);
+      g.addColorStop(0,'rgba(80,30,60,0.6)');
+      g.addColorStop(1,'rgba(30,10,30,0.9)');
+      fx.fillStyle = g;
+      fx.fillRect(0,0,W,H);
+
+      for(var i=0;i<fxItems.length;i++){
+        var p = fxItems[i];
+        p.sway += p.swayS;
+        p.x += p.vx + Math.sin(p.sway)*0.5;
+        p.y += p.vy;
+        p.rot += p.vr;
+        if(p.y > H+20){p.y=-20;p.x=Math.random()*W}
+        if(p.x < -20) p.x = W+20;
+        if(p.x > W+20) p.x = -20;
+        fx.save();fx.translate(p.x,p.y);fx.rotate(p.rot);
+        fx.fillStyle='rgba(255,158,196,0.7)';
+        fx.beginPath();fx.ellipse(0,0,p.s*0.5,p.s,0,0,Math.PI*2);fx.fill();
+        fx.restore();
+      }
+      return;
+    }
+
+    if(fxType === 'anime_dn'){
+      /* чёрный фон + падающие буквы */
+      fx.fillStyle = 'rgba(10,0,0,0.15)';
+      fx.fillRect(0,0,W,H);
+
+      if(!lettersCache) buildLetters();
+      fx.font = 'bold 20px serif';
+      for(var j=0;j<lettersCache.length;j++){
+        var l = lettersCache[j];
+        l.y += l.v;
+        if(l.y > 1.05) l.y = -0.05;
+        fx.fillStyle = 'rgba(239,68,68,0.5)';
+        fx.fillText('K', l.x * W, l.y * H);
+        fx.fillText('R', l.x * W + 15, l.y * H + 10);
+      }
+      return;
+    }
+
+    if(fxType === 'cyber'){
+      /* тёмно-фиолетовый + неоновая сетка + дождь */
+      fx.fillStyle = 'rgba(10,0,20,0.9)';
+      fx.fillRect(0,0,W,H);
+
+      /* неоновая сетка */
+      fx.strokeStyle = 'rgba(255,0,170,0.15)';
+      fx.lineWidth = 1;
+      for(var x=0; x<W; x+=50){
+        fx.beginPath();
+        fx.moveTo(x, 0);
+        fx.lineTo(x, H);
+        fx.stroke();
+      }
+      for(var y=0; y<H; y+=50){
+        fx.beginPath();
+        fx.moveTo(0, y);
+        fx.lineTo(W, y);
+        fx.stroke();
+      }
+
+      /* звёзды */
+      if(!starsCache) buildStars();
+      for(var k=0;k<starsCache.length;k++){
+        var s = starsCache[k];
+        fx.fillStyle = 'rgba(0,255,255,' + (s.a * (0.5 + Math.sin(Date.now()*0.003 + k)*0.5)) + ')';
+        fx.beginPath();
+        fx.arc(s.x * W, s.y * H, s.r, 0, Math.PI*2);
+        fx.fill();
+      }
+      return;
+    }
+
+    /* остальные — старая отрисовка */
+    origDrawNew();
+  };
+
+  /* отрисовка фонов зависит от fxItems, они создаются в startFx */
+  /* для anime_t используем те же лепестки что и у сакуры */
+  var _origStartFx = window.startFx;
+  if(typeof _origStartFx === 'function'){
+    window.startFx = function(type){
+      if(type === 'anime_t'){
+        fxType = 'anime_t';
+        var W = window.innerWidth, H = window.innerHeight;
+        fxCanvas.width = W * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.height = H * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.style.width = W + 'px';
+        fxCanvas.style.height = H + 'px';
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        fx.setTransform(dpr,0,0,dpr,0,0);
+        fxItems = [];
+        var n = Math.min(28, Math.floor(W/16));
+        for(var i=0;i<n;i++){
+          fxItems.push({x:Math.random()*W,y:Math.random()*H,s:6+Math.random()*6,vy:0.5+Math.random()*0.9,vx:-0.4+Math.random()*0.8,rot:Math.random()*Math.PI*2,vr:-0.03+Math.random()*0.06,sway:Math.random()*Math.PI*2,swayS:0.02+Math.random()*0.02});
+        }
+        return;
+      }
+      if(type === 'anime_dn'){
+        fxType = 'anime_dn';
+        lettersCache = null;
+        var W2 = window.innerWidth, H2 = window.innerHeight;
+        fxCanvas.width = W2 * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.height = H2 * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.style.width = W2 + 'px';
+        fxCanvas.style.height = H2 + 'px';
+        var dpr2 = Math.min(window.devicePixelRatio || 1, 2);
+        fx.setTransform(dpr2,0,0,dpr2,0,0);
+        fxItems = [];
+        return;
+      }
+      if(type === 'cyber'){
+        fxType = 'cyber';
+        starsCache = null;
+        var W3 = window.innerWidth, H3 = window.innerHeight;
+        fxCanvas.width = W3 * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.height = H3 * Math.min(window.devicePixelRatio || 1, 2);
+        fxCanvas.style.width = W3 + 'px';
+        fxCanvas.style.height = H3 + 'px';
+        var dpr3 = Math.min(window.devicePixelRatio || 1, 2);
+        fx.setTransform(dpr3,0,0,dpr3,0,0);
+        fxItems = [];
+        return;
+      }
+      _origStartFx(type);
+    };
+  }
+})();
+/* ================= ПЛАТНЫЕ PREM И ЗАКОНЫ ================= */
+(function(){
+  var PRICE_PREM = 640;
+  var PRICE_LAWS = 100;
+
+  /* --- Обработчик открытия Prem --- */
+  var openPrem = document.getElementById('openPrem');
+  if(openPrem){
+    var origPrem = openPrem.onclick;
+    openPrem.onclick = function(){
+      if(typeof currentUser === 'undefined' || !currentUser){
+        if(typeof toast === 'function') toast('Войди в аккаунт');
+        if(typeof openAuth === 'function') openAuth();
+        return;
+      }
+      var p = getProfile(currentUser.login);
+      var owned = currentUser.admin || p.premBought === true;
+
+      if(!owned){
+        showBuyDialog('PremV1,4', PRICE_PREM, function(){
+          p.premBought = true;
+        });
+        return;
+      }
+
+      if(origPrem) origPrem();
+    };
+  }
+
+  /* --- Обработчик открытия Законов --- */
+  var openLaws = document.getElementById('openLaws');
+  if(openLaws){
+    var origLaws = openLaws.onclick;
+    openLaws.onclick = function(){
+      if(typeof currentUser === 'undefined' || !currentUser){
+        if(typeof toast === 'function') toast('Войди в аккаунт');
+        if(typeof openAuth === 'function') openAuth();
+        return;
+      }
+      var p = getProfile(currentUser.login);
+      var owned = currentUser.admin || p.lawsBought === true;
+
+      if(!owned){
+        showBuyDialog('Законы', PRICE_LAWS, function(){
+          p.lawsBought = true;
+        });
+        return;
+      }
+
+      if(origLaws) origLaws();
+    };
+  }
+
+  /* --- Окно покупки --- */
+  function showBuyDialog(name, price, onBuy){
+    var ov = document.createElement('div');
+    ov.className = 'ov on';
+    ov.style.zIndex = 7500;
+    ov.innerHTML =
+      '<div class="mod" style="text-align:center">' +
+        '<div style="font-size:44px;margin-bottom:10px">🔒</div>' +
+        '<h3 style="margin-bottom:8px">' + name + '</h3>' +
+        '<div style="font-size:13px;color:var(--mut);margin-bottom:16px">Содержимое откроется после покупки</div>' +
+        '<div style="font-size:22px;color:var(--gold);font-weight:800;margin-bottom:16px">' + price + '★</div>' +
+        '<div class="mod-btns">' +
+          '<button class="no" id="buyCancel">Отмена</button>' +
+          '<button class="ok" id="buyConfirm">Купить</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    document.getElementById('buyCancel').onclick = function(){
+      document.body.removeChild(ov);
+    };
+    document.getElementById('buyConfirm').onclick = function(){
+      if(typeof currentUser === 'undefined' || !currentUser){
+        document.body.removeChild(ov);
+        return;
+      }
+      var p = getProfile(currentUser.login);
+      if(p.stars < price){
+        if(typeof toast === 'function') toast('Не хватает ' + price + '★');
+        return;
+      }
+      p.stars -= price;
+      onBuy();
+      saveProfiles();
+      if(typeof renderProfile === 'function') renderProfile();
+      if(typeof renderShop === 'function') renderShop();
+      if(typeof updateUserUI === 'function') updateUserUI();
+      document.body.removeChild(ov);
+      if(typeof toast === 'function') toast('Куплено: ' + name);
+    };
+  }
+
+  /* --- Показываем замок на некупленных --- */
+  function updateLocks(){
+    if(typeof currentUser === 'undefined' || !currentUser) return;
+    var p = getProfile(currentUser.login);
+    var premOwned = currentUser.admin || p.premBought === true;
+    var lawsOwned = currentUser.admin || p.lawsBought === true;
+
+    var premCard = document.getElementById('openPrem');
+    var lawsCard = document.getElementById('openLaws');
+
+    if(premCard){
+      var desc = premCard.querySelector('.section-desc');
+      if(desc && !premOwned) desc.textContent = '🔒 ' + PRICE_PREM + '★';
+      else if(desc && premOwned) desc.textContent = 'Основной премиум промпт';
+    }
+    if(lawsCard){
+      var desc2 = lawsCard.querySelector('.section-desc');
+      if(desc2 && !lawsOwned) desc2.textContent = '🔒 ' + PRICE_LAWS + '★';
+      else if(desc2 && lawsOwned) desc2.textContent = 'Список принятых законов';
+    }
+  }
+
+  setInterval(updateLocks, 1000);
+})();
 </script>
 </body>
   </html>
